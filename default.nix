@@ -5,5 +5,6 @@ pkgs.mkShell {
   packages = [
     pkgs.openssl
     pkgs.pkg-config
+	pkgs.rustc
   ];
 }

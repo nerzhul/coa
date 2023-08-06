@@ -1,0 +1,82 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug 'analyzer'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=analyzer",
+					"--package=coa"
+				],
+				"filter": {
+					"name": "analyzer",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in 'analyzer'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=analyzer",
+					"--package=coa"
+				],
+				"filter": {
+					"name": "analyzer",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug 'apiservice'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=apiservice",
+					"--package=coa"
+				],
+				"filter": {
+					"name": "apiservice",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in 'apiservice'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=apiservice",
+					"--package=coa"
+				],
+				"filter": {
+					"name": "apiservice",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}

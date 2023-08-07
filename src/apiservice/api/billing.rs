@@ -1,15 +1,16 @@
 use axum::{
 	http::StatusCode,
+	Json,
 };
 use utoipa::ToSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, ToSchema, Clone)]
-pub struct BillingEntry {
-	id: i32,
-	#[schema(example = "Buy groceries")]
-	value: String,
-	done: bool,
+pub struct PodBillingEntry {
+	namespace: String,
+	pod_name: String,
+	start_time: Option<String>,
+	end_time: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone)]
@@ -19,12 +20,12 @@ pub struct BillingResult {
 
 #[utoipa::path(
 	post,
-	path = "/v1/billing",
+	path = "/v1/billing/pod",
 	responses(
 		(status = 200, description = "Publish billing states", body = [BillingResult])
 	)
 )]
-pub async fn add_entries() -> (StatusCode, &'static str) {
-	let r ="OK";
-	(StatusCode::CREATED, r)
+pub async fn post_pod_invoice() -> (StatusCode, Json<BillingResult>) {
+	let r = BillingResult{status: "OK".to_string()};
+	(StatusCode::CREATED, Json(r.clone()))
 }

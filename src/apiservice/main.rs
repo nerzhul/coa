@@ -54,7 +54,8 @@ async fn main() -> Result<(), Error> {
 		Err(_e) => 10
 	};
 
-	let mut _db = db::create_pool(db_host, db_name, db_user, db_password, db_pool_size);
+	let _db = db::Database::new(db_host, db_name, db_user, db_password, db_pool_size).await;
+	println!("db is ok ? {}: {}", _db.is_ok(), _db.err().unwrap());
 
     // build our application with a route
     let app = Router::new()

@@ -1,6 +1,4 @@
-use axum::{
-	extract::Path,
-};
+use axum::extract::Path;
 
 #[utoipa::path(
 	get,

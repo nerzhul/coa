@@ -17,7 +17,6 @@ hyper = "0.14.27"
 deadpool-postgres = "0.10.5"
 tokio-postgres = { version = "0.7.8", features = ["with-uuid-0_8", "with-uuid-1"] }
 refinery = { version = "0.8.10", features = ["tokio-postgres"] }
-time = "0.2"
 
 [[bin]]
 name = "analyzer"

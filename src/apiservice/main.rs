@@ -1,4 +1,3 @@
-use hyper::Error;
 use axum::{
     routing,
     Router,
@@ -6,7 +5,6 @@ use axum::{
 use utoipa::OpenApi;
 use utoipa_redoc::{Redoc, Servable};
 use utoipa_swagger_ui::SwaggerUi;
-use std::net::SocketAddr;
 use std::env;
 
 mod api;
@@ -37,7 +35,7 @@ fn result_to_option(result: Result<String, env::VarError>) -> Option<String> {
  }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let db_user = result_to_option(env::var("DB_USERNAME"));
 	let db_password = result_to_option(env::var("DB_PASSWORD"));
 	let db_name = result_to_option(env::var("DB_NAME"));
@@ -53,11 +51,10 @@ async fn main() -> Result<(), Error> {
 		Err(_e) => 10
 	};
 
-	let _db = db::Database::new(db_host, db_name, db_user, db_password, db_pool_size).await;
-	println!("db is ok ? {}: {}", _db.is_ok(), _db.err().unwrap());
+	let db = db::Database::new(db_host, db_name, db_user, db_password, db_pool_size).await?;
 
-    // build our application with a route
-    let app = Router::new()
+	// build our application with a route
+    let app: Router<()> = Router::new()
         .route("/", routing::get(root))
 		//.route("/openapi.json", routing::get(ApiDoc::openapi()))
 		.merge(SwaggerUi::new("/swagger-ui").url("/openapi.json", ApiDoc::openapi()))
@@ -68,15 +65,14 @@ async fn main() -> Result<(), Error> {
 		.route("/v1/issues/:issue_type/:namespace", routing::get(api::issues::list_issues_by_type))
         .route("/v1/billing/pod", routing::post(api::billing::post_pod_invoice))
 		.route("/v1/health/liveness", routing::get(health::liveness))
-		.route("/v1/health/readiness", routing::get(health::readiness));
+		.route("/v1/health/readiness", routing::get(health::readiness))
+		.with_state(db.clone());
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
+    let _ = axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    .serve(app.into_make_service())
+    .await;
+
+	Ok(())
 }
 
 // basic handler that responds with a static string

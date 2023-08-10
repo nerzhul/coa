@@ -18,6 +18,8 @@ const STMT_ADD_OBJECT_ISSUE: &str = "INSERT INTO object_issue(object_id, categor
 	linked_object_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
 const STMT_GET_OBJECT_ISSUES: &str = "SELECT object_id, category, details, severity, issue_tech_id, issue_message, reported_by, reported_at, last_seen_at, linked_object_id \
 	FROM object_issue WHERE object_id IN (SELECT id FROM namespaced_object WHERE object_type = $1 AND object_name = $2 AND namespace = $3 AND cluster = $4)";
+
+#[derive(Clone)]
 pub struct Database {
 	pool: Pool
 }
@@ -98,20 +100,20 @@ impl Database {
 		Ok(())
 	}
 
-	async fn add_namespaced_object(&self, ns_object: objects::NamespacedObject) -> Result<(), Error> {
+	pub async fn add_namespaced_object(&self, ns_object: objects::NamespacedObject) -> Result<(), Error> {
 		let conn = self.pool.get().await?;
 		conn.execute(STMT_ADD_NAMESPACED_OBJECT, &[&ns_object.object_type, &ns_object.object_name, &ns_object.namespace, &ns_object.cluster]).await?;
 		Ok(())
 	}
 
-	async fn get_namespaced_object_id(&self, ns_object: objects::NamespacedObject) -> Result<i32, Error> {
+	pub async fn get_namespaced_object_id(&self, ns_object: objects::NamespacedObject) -> Result<i32, Error> {
 		let conn = self.pool.get().await?;
 		let row = conn.query_one(STMT_GET_NAMESPACED_OBJECT_ID, &[&ns_object.object_type, &ns_object.object_name, &ns_object.namespace, &ns_object.cluster]).await?;
 		let id: i32 = row.get(0);
 		Ok(id)
 	}
 
-	async fn add_object_issue(&self, object_issue: objects::ObjectIssue) -> Result<(), Error> {
+	pub async fn add_object_issue(&self, object_issue: objects::ObjectIssue) -> Result<(), Error> {
 		let conn = self.pool.get().await?;
 		conn.execute(STMT_ADD_OBJECT_ISSUE, &[
 			&object_issue.object_id,
@@ -127,7 +129,7 @@ impl Database {
 		Ok(())
 	}
 
-	async fn get_object_issues(&self, object_type: &str, object_name: &str, namespace: &str, cluster: &str) -> Result<Vec<objects::ObjectIssue>, Error> {
+	pub async fn get_object_issues(&self, object_type: &str, object_name: &str, namespace: &str, cluster: &str) -> Result<Vec<objects::ObjectIssue>, Error> {
 		let conn = self.pool.get().await?;
 		let rows = conn.query(STMT_GET_OBJECT_ISSUES, &[&object_type, &object_name, &namespace, &cluster]).await?;
 		let mut issues: Vec<objects::ObjectIssue> = Vec::new();

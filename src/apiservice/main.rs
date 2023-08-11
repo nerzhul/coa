@@ -51,6 +51,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 		Err(_e) => 10
 	};
 
+	if env::var("KUBECONFIG").is_err() {
+		eprintln!("KUBECONFIG environment variable not set");
+		std::process::exit(1);
+	}
+
 	let db = db::Database::new(db_host, db_name, db_user, db_password, db_pool_size).await?;
 
 	// build our application with a route

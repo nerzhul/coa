@@ -1,8 +1,11 @@
 use axum::{
     routing,
     Router,
-	Extension,
+	Extension, error_handling::HandleErrorLayer, BoxError,
 };
+use hyper::StatusCode;
+use log::{error, info};
+use tower::timeout::TimeoutLayer;
 use utoipa::OpenApi;
 use utoipa_redoc::{Redoc, Servable};
 use utoipa_swagger_ui::SwaggerUi;
@@ -54,6 +57,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 		Err(_e) => 10
 	};
 
+	let request_timeout = match env::var("REQUEST_TIMEOUT") {
+		Ok(timeout) => match timeout.parse::<u64>() {
+			Ok(i) => i,
+			Err(e) => {
+				eprintln!("Failed to parse REQUEST_TIMEOUT: {}, not an integer: {}", timeout, e);
+				60000
+			}
+		},
+		Err(_e) => 60000
+	};
+
+	info!("request timeout set to {}ms", request_timeout);
+
 	if env::var("KUBECONFIG").is_err() {
 		eprintln!("KUBECONFIG environment variable not set");
 		std::process::exit(1);
@@ -75,8 +91,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .route("/v1/billing/pod", routing::post(api::billing::post_pod_invoice))
 		.route("/v1/health/liveness", routing::get(health::liveness))
 		.route("/v1/health/readiness", routing::get(health::readiness))
-		.layer(Extension(db))
-		.layer(Extension(kube_client));
+		.layer(
+			tower::ServiceBuilder::new()
+				.layer(Extension(db))
+				.layer(Extension(kube_client))
+				.layer(HandleErrorLayer::new(|_: BoxError| async {
+                    error!("request timeout");
+                    StatusCode::REQUEST_TIMEOUT
+                }))
+				.layer(TimeoutLayer::new(std::time::Duration::from_millis(request_timeout)))
+		);
+
 
     let _ = axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
     .serve(app.into_make_service())

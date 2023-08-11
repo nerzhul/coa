@@ -19,6 +19,7 @@ tokio-postgres = { version = "0.7.8", features = ["with-uuid-0_8", "with-uuid-1"
 refinery = { version = "0.8.10", features = ["tokio-postgres"] }
 log = "0.4.19"
 std-logger = "0.5.2"
+tower = { version = "0.4.13", features = ["timeout"] }
 
 [[bin]]
 name = "analyzer"

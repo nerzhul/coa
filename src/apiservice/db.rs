@@ -96,8 +96,6 @@ impl Database {
 			);
 		}
 
-		info!("DB migrations finished!");
-
 		Ok(())
 	}
 

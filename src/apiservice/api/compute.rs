@@ -1,3 +1,5 @@
+use super::helpers;
+
 #[utoipa::path(
 	get,
 	path = "/v1/compute/:namespace",
@@ -6,5 +8,7 @@
 	)
 )]
 pub async fn list() -> &'static str {
+	let (username, groups) = helpers::get_user_context();
+	
 	"List Compute"
 }

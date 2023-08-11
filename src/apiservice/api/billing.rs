@@ -5,6 +5,8 @@ use axum::{
 use utoipa::ToSchema;
 use serde::{Deserialize, Serialize};
 
+use super::helpers;
+
 #[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct PodBillingEntry {
 	namespace: String,
@@ -26,6 +28,8 @@ pub struct BillingResult {
 	)
 )]
 pub async fn post_pod_invoice() -> (StatusCode, Json<BillingResult>) {
+	let (username, groups) = helpers::get_user_context();
+
 	let r = BillingResult{status: "OK".to_string()};
 	(StatusCode::CREATED, Json(r.clone()))
 }

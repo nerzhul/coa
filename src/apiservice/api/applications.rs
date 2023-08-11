@@ -1,5 +1,7 @@
 use axum::extract::Path;
 
+use crate::api::helpers;
+
 #[utoipa::path(
 	get,
 	path = "/v1/applications/gitops/:namespace",
@@ -8,5 +10,7 @@ use axum::extract::Path;
 	)
 )]
 pub async fn list_gitops_applications(Path(namespace): Path<String>) -> String {
+	let (username, groups) = helpers::get_user_context();
+	
 	format!("List GitOps Applications {}", namespace)
 }

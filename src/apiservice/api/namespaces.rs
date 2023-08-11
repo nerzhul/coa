@@ -1,10 +1,12 @@
-use axum::Json;
+use axum::{Json, extract::State};
+use hyper::StatusCode;
 use kube::{
 	Api as KubeApi,
 	api::ListParams,
 	Client,
 };
 use k8s_openapi::api::core::v1::Namespace;
+use crate::api::ApiContext;
 
 #[utoipa::path(
 	get,
@@ -13,15 +15,15 @@ use k8s_openapi::api::core::v1::Namespace;
 		(status = 200, description = "List all namespaces")
 	)
 )]
-pub async fn list() -> Json<Vec<String>> {
-	// TODO: implement auth & filtering based on rights/rbac
+pub async fn list(State(ctx): State<ApiContext>) -> Result<Json<Vec<String>>, StatusCode> {
 	let mut r = vec![];
 
-	let client = Client::try_default().await.unwrap();
-	let namespaces: KubeApi<Namespace> = KubeApi::all(client);
+	// TODO: implement auth & filtering based on rights/rbac
+
+	let namespaces: KubeApi<Namespace> = KubeApi::all(ctx.kube_client);
 	namespaces.list(&ListParams::default()).await.unwrap().items.into_iter().for_each(|ns| {
 		r.push(ns.metadata.name.unwrap());
 	});
 
-	Json(r)
+	Ok(Json(r))
 }

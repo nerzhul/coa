@@ -58,6 +58,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let db = db::Database::new(db_host, db_name, db_user, db_password, db_pool_size).await?;
 
+	let ctx = api::ApiContext {
+		db: db.clone(),
+		kube_client: kube::Client::try_default().await.unwrap(),
+	};
+
 	// build our application with a route
     let app: Router<()> = Router::new()
         .route("/", routing::get(root))
@@ -71,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .route("/v1/billing/pod", routing::post(api::billing::post_pod_invoice))
 		.route("/v1/health/liveness", routing::get(health::liveness))
 		.route("/v1/health/readiness", routing::get(health::readiness))
-		.with_state(db.clone());
+		.with_state(ctx);
 
     let _ = axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
     .serve(app.into_make_service())

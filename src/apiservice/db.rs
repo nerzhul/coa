@@ -1,4 +1,5 @@
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
+use log::info;
 use tokio_postgres::NoTls;
 use std::{
 	option::Option,
@@ -80,7 +81,7 @@ impl Database {
 	}
 
 	async fn run_migrations(&self) -> Result<(), Error> {
-		println!("Running DB migrations...");
+		info!("Running DB migrations...");
 		let mut conn = self.pool.get().await.unwrap();
 		let client = &mut **conn;
 		let migration_report = embedded::migrations::runner()
@@ -88,14 +89,14 @@ impl Database {
 			.await?;
 
 		for migration in migration_report.applied_migrations() {
-			println!(
+			info!(
 				"Migration Applied -  Name: {}, Version: {}",
 				migration.name(),
 				migration.version()
 			);
 		}
 
-		println!("DB migrations finished!");
+		info!("DB migrations finished!");
 
 		Ok(())
 	}

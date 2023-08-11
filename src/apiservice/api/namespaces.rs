@@ -1,12 +1,11 @@
-use axum::{Json, extract::State};
+
+use axum::{Json, Extension};
 use hyper::StatusCode;
-use kube::{
-	Api as KubeApi,
-	api::ListParams,
-	Client,
-};
+use kube::api::ListParams;
 use k8s_openapi::api::core::v1::Namespace;
-use crate::api::ApiContext;
+use log::error;
+
+use super::helpers;
 
 #[utoipa::path(
 	get,
@@ -15,15 +14,44 @@ use crate::api::ApiContext;
 		(status = 200, description = "List all namespaces")
 	)
 )]
-pub async fn list(State(ctx): State<ApiContext>) -> Result<Json<Vec<String>>, StatusCode> {
-	let mut r = vec![];
+pub async fn list(Extension(kube_client): Extension<kube::Client>) -> Result<Json<Vec<String>>, StatusCode> {
+	let mut result = vec![];
 
-	// TODO: implement auth & filtering based on rights/rbac
+	let (username, groups) = helpers::get_user_context();
 
-	let namespaces: KubeApi<Namespace> = KubeApi::all(ctx.kube_client);
-	namespaces.list(&ListParams::default()).await.unwrap().items.into_iter().for_each(|ns| {
-		r.push(ns.metadata.name.unwrap());
-	});
+	let namespaces: kube::Api<Namespace> = kube::Api::all(kube_client.clone());
+	match namespaces.list(&ListParams::default()).await {
+		Ok(r) => {
+			for ns in r.items {
+				// Check individual namespace rights
+				let namespace_name = match ns.metadata.name {
+					Some(n) => n,
+					None => {
+						error!("Namespace without name found");
+						return Err(StatusCode::INTERNAL_SERVER_ERROR);
+					},
+				};
 
-	Ok(Json(r))
+				match helpers::has_rights(&kube_client, &namespace_name, &username, &groups).await {
+					Ok(r) => {
+						if !r {
+							continue
+						}
+					},
+					Err(e) => {
+						error!("Error while checking rights: {}", e);
+						return Err(StatusCode::INTERNAL_SERVER_ERROR);
+					}
+				}
+
+				result.push(namespace_name);
+			}
+		},
+		Err(e) => {
+			error!("Error while listing namespaces: {}", e);
+			return Err(StatusCode::INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	Ok(Json(result))
 }

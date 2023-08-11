@@ -1,6 +1,7 @@
 use axum::{
     routing,
     Router,
+	Extension,
 };
 use utoipa::OpenApi;
 use utoipa_redoc::{Redoc, Servable};
@@ -36,6 +37,8 @@ fn result_to_option(result: Result<String, env::VarError>) -> Option<String> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+	std_logger::Config::logfmt().init();
+
 	let db_user = result_to_option(env::var("DB_USERNAME"));
 	let db_password = result_to_option(env::var("DB_PASSWORD"));
 	let db_name = result_to_option(env::var("DB_NAME"));
@@ -57,11 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	}
 
 	let db = db::Database::new(db_host, db_name, db_user, db_password, db_pool_size).await?;
-
-	let ctx = api::ApiContext {
-		db: db.clone(),
-		kube_client: kube::Client::try_default().await.unwrap(),
-	};
+	let kube_client = kube::Client::try_default().await.unwrap();
 
 	// build our application with a route
     let app: Router<()> = Router::new()
@@ -76,7 +75,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .route("/v1/billing/pod", routing::post(api::billing::post_pod_invoice))
 		.route("/v1/health/liveness", routing::get(health::liveness))
 		.route("/v1/health/readiness", routing::get(health::readiness))
-		.with_state(ctx);
+		.layer(Extension(db))
+		.layer(Extension(kube_client));
 
     let _ = axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
     .serve(app.into_make_service())

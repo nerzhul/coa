@@ -103,9 +103,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 		);
 
 
-    let _ = axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    match axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
     .serve(app.into_make_service())
-    .await;
+    .await {
+		Ok(_) => {},
+		Err(e) => {
+			eprintln!("Failed to start server: {}", e);
+			std::process::exit(1);
+		}
+	}
 
 	Ok(())
 }

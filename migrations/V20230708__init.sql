@@ -1,12 +1,3 @@
-CREATE TABLE "namespaced_objects" (
-	cluster_name TEXT NOT NULL,
-	namespace_name TEXT NOT NULL,
-	object_name TEXT NOT NULL,
-	object_type TEXT NOT NULL,
-	id UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
-	CONSTRAINT pkey_issues_objects PRIMARY KEY(object_name, object_type, cluster_name, namespace_name)
-);
-
 CREATE TYPE "issue_category" AS ENUM (
 	'security',
 	'reliability',
@@ -23,6 +14,17 @@ CREATE TYPE "issue_severity" AS ENUM (
 	'unknown'
 );
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE "namespaced_objects" (
+	cluster_name TEXT NOT NULL,
+	namespace_name TEXT NOT NULL,
+	object_name TEXT NOT NULL,
+	object_type TEXT NOT NULL,
+	id UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
+	CONSTRAINT pkey_issues_objects PRIMARY KEY(object_name, object_type, cluster_name, namespace_name)
+);
+
 CREATE TABLE "issues" (
 	id UUID NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
 	object_id UUID NOT NULL,
@@ -36,6 +38,6 @@ CREATE TABLE "issues" (
 	last_seen_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
 	linked_object_id UUID,
 
-	CONSTRAINT fk_namespaced_objects FOREIGN KEY(object_id) REFERENCES namespaced_objects(id) ON DELETE CASCADE
+	CONSTRAINT fk_namespaced_objects FOREIGN KEY(object_id) REFERENCES namespaced_objects(id) ON DELETE CASCADE,
 	CONSTRAINT fk_issues_subobjobject_id FOREIGN KEY(linked_object_id) REFERENCES namespaced_objects(id) ON DELETE SET NULL(linked_object_id)
 );

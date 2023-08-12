@@ -1,4 +1,4 @@
-# Container orchestrator analyzer
+# Container orchestrator insights
 
 This is an experimental project around container orchestrators
 

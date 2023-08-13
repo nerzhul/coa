@@ -24,11 +24,14 @@ mod db;
 		api::compute::list,
 
 		api::issues::list_issues_by_type,
+		api::issues::store_issues,
 	),
 	components(
 		schemas(
 			api::billing::PodBillingEntry,
 			api::billing::BillingResult,
+			api::issues::Issue,
+			api::issues::IssueBulkList,
 		),
 	)
 )]
@@ -88,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 		.route("/v1/applications/gitops/:namespace", routing::get(api::applications::list_gitops_applications))
 		.route("/v1/compute/:namespace", routing::get(api::compute::list))
 		.route("/v1/issues/:issue_type/:namespace", routing::get(api::issues::list_issues_by_type))
+		.route("/v1/issues", routing::post(api::issues::store_issues))
         .route("/v1/billing/pod", routing::post(api::billing::post_pod_invoice))
 		.route("/v1/health/liveness", routing::get(health::liveness))
 		.route("/v1/health/readiness", routing::get(health::readiness))

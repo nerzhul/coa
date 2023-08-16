@@ -17,6 +17,7 @@ mod db;
 #[derive(OpenApi)]
 #[openapi(
 	paths(
+		api::cluster::get,
 		api::namespaces::list,
 
 		api::applications::list_gitops_applications,
@@ -30,6 +31,8 @@ mod db;
 		schemas(
 			api::billing::PodBillingEntry,
 			api::billing::BillingResult,
+
+			api::cluster::ClusterIdentity,
 			api::issues::IssuesNamespaceParams,
 			api::issues::Issue,
 			api::issues::IssueObject,
@@ -63,6 +66,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 		Err(_e) => 10
 	};
 
+	let cluster_name: String = match env::var("CLUSTER_NAME") {
+		Ok(cluster_name) => cluster_name,
+		Err(_e) => "unknown".to_string()
+	};
+
 	let request_timeout = match env::var("REQUEST_TIMEOUT") {
 		Ok(timeout) => match timeout.parse::<u64>() {
 			Ok(i) => i,
@@ -90,6 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 		//.route("/openapi.json", routing::get(ApiDoc::openapi()))
 		.merge(SwaggerUi::new("/swagger-ui").url("/openapi.json", ApiDoc::openapi()))
 		.merge(Redoc::with_url("/redoc", ApiDoc::openapi()))
+		.route("/v1/cluster", routing::get(api::cluster::get))
 		.route("/v1/namespaces", routing::get(api::namespaces::list))
 		.route("/v1/applications/gitops/:namespace_name", routing::get(api::applications::list_gitops_applications))
 		.route("/v1/compute/:namespace", routing::get(api::compute::list))
@@ -102,6 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 			tower::ServiceBuilder::new()
 				.layer(Extension(db))
 				.layer(Extension(kube_client))
+				.layer(Extension(api::cluster::ClusterIdentity::new(cluster_name)))
 				.layer(HandleErrorLayer::new(|_: BoxError| async {
                     error!("request timeout");
                     StatusCode::REQUEST_TIMEOUT

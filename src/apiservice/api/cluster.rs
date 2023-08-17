@@ -1,16 +1,16 @@
-use axum::{Json, Extension};
+use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq, Eq)]
 pub struct ClusterIdentity {
-	name: String,
+    name: String,
 }
 
 impl ClusterIdentity {
-	pub fn new(name: String) -> Self {
-		Self { name }
-	}
+    pub fn new(name: String) -> Self {
+        Self { name }
+    }
 }
 
 #[utoipa::path(
@@ -21,5 +21,5 @@ impl ClusterIdentity {
 	)
 )]
 pub async fn get(Extension(cluster_identity): Extension<ClusterIdentity>) -> Json<ClusterIdentity> {
-	Json(cluster_identity)
+    Json(cluster_identity)
 }

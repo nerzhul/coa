@@ -9,6 +9,7 @@ pkgs.mkShell {
     pkgs.rustc
     pkgs.cargo
     pkgs.rustup
+	pkgs.rustfmt
   ];
   RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
 }

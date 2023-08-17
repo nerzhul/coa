@@ -10,7 +10,7 @@ use crate::api::helpers;
 	)
 )]
 pub async fn list_gitops_applications(Path(namespace): Path<String>) -> String {
-	let (username, groups) = helpers::get_user_context();
-	
-	format!("List GitOps Applications {}", namespace)
+    let (username, groups) = helpers::get_user_context();
+
+    format!("List GitOps Applications {}", namespace)
 }

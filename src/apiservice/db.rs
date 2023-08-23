@@ -1,4 +1,4 @@
-use crate::api::{issues, objects};
+use crate::api::{issues::{self, IssueCategory}, objects};
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use log::info;
 use std::{option::Option, result::Result};
@@ -17,12 +17,12 @@ const STMT_ADD_OBJECT_ISSUE: &str = "INSERT INTO issues(object_id, category, det
 	linked_object_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
 const STMT_GET_NAMESPACED_OBJECTS_WITH_ISSUES_WITH_CATEGORY: &str = "SELECT id, object_type, object_name, namespace_name, cluster_name FROM namespaced_objects WHERE \
 	(\
-		id IN (SELECT object_id FROM issues WHERE category = $2::issue_category) \
+		id IN (SELECT object_id FROM issues WHERE category = $2) \
 		OR \
-		id IN (SELECT linked_object_id FROM issues WHERE category = $2::issue_category) \
+		id IN (SELECT linked_object_id FROM issues WHERE category = $2) \
 	) AND namespace_name = $1";
 const STMT_GET_ISSUES_WITH_CATEGORY_FOR_NAMESPACE: &str = "SELECT object_id, category::text, details, severity, issue_tech_id, issue_message, reported_by, reported_at, last_seen_at, linked_object_id \
-	FROM issues WHERE object_id IN (SELECT id FROM namespaced_objects WHERE namespace_name = $2) AND category = $1::issue_category";
+	FROM issues WHERE object_id IN (SELECT id FROM namespaced_objects WHERE namespace_name = $2) AND category = $1";
 
 #[derive(Clone)]
 pub struct Database {
@@ -182,7 +182,7 @@ impl Database {
 
     pub async fn get_issues_with_category_for_namespace(
         &self,
-        category: &str,
+        category: IssueCategory,
         namespace: &str,
     ) -> Result<Vec<issues::Issue>, Error> {
         let conn = self.pool.get().await?;
@@ -213,7 +213,7 @@ impl Database {
 
     pub async fn get_objects_with_issue_category_in_namespace(
         &self,
-        category: &str,
+        category: IssueCategory,
         namespace: &str,
     ) -> Result<Vec<objects::NamespacedObject>, Error> {
         let conn = self.pool.get().await?;
@@ -226,11 +226,11 @@ impl Database {
         let mut objects: Vec<objects::NamespacedObject> = Vec::new();
         for row in rows {
             let object = objects::NamespacedObject {
-                id: row.get(0),
-                object_type: row.get(1),
-                object_name: row.get(2),
-                namespace: row.get(3),
-                cluster: row.get(4),
+                id: row.get("id"),
+                object_type: row.get("object_type"),
+                object_name: row.get("object_name"),
+                namespace: row.get("namespace"),
+                cluster: row.get("cluster"),
             };
             objects.push(object);
         }

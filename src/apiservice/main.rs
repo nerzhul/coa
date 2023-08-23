@@ -18,7 +18,7 @@ mod db;
         api::applications::list_gitops_applications,
         api::compute::list,
         api::billing::post_pod_invoice,
-        api::issues::list_issues_by_type,
+        api::issues::list_issues_by_category,
         api::issues::store_issues,
     ),
     components(schemas(
@@ -104,8 +104,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         )
         .route("/v1/compute/:namespace", routing::get(api::compute::list))
         .route(
-            "/v1/issues/:issue_type/:namespace_name",
-            routing::get(api::issues::list_issues_by_type),
+            "/v1/issues/:category/:namespace_name",
+            routing::get(api::issues::list_issues_by_category),
         )
         .route("/v1/issues", routing::post(api::issues::store_issues))
         .route(

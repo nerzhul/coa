@@ -1,11 +1,7 @@
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-
 use axum::{extract::Path, http::StatusCode, Extension, Json};
 use log::error;
 use serde::{Deserialize, Serialize};
-use tokio_postgres::types::private::BytesMut;
-use tokio_postgres::types::{to_sql_checked, FromSql, IsNull, Type};
+use postgres_types::{ToSql, FromSql};
 use utoipa::ToSchema;
 
 use crate::db::Database;
@@ -13,7 +9,8 @@ use crate::db::Database;
 use super::helpers;
 use super::objects::NamespacedObject;
 
-#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+#[derive(Debug, FromSql, ToSql, Deserialize, Serialize, Clone)]
+#[postgres(name = "issue_category", rename_all = "lowercase")]
 pub enum IssueCategory {
     Security,
     Reliability,
@@ -22,72 +19,22 @@ pub enum IssueCategory {
     Unknown,
 }
 
-impl FromSql<'_> for IssueCategory {
-    fn from_sql(_sql_type: &Type, value: &[u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        match value {
-            b"security" => Ok(IssueCategory::Security),
-            b"reliability" => Ok(IssueCategory::Reliability),
-            b"performance" => Ok(IssueCategory::Performance),
-            b"configuration" => Ok(IssueCategory::Configuration),
-            _ => Ok(IssueCategory::Unknown),
-        }
-    }
-
-    fn accepts(sql_type: &Type) -> bool {
-        sql_type.name() == "issue_category"
-    }
+#[derive(Debug, FromSql, ToSql, Deserialize, Serialize, Clone)]
+#[postgres(name = "issue_severity", rename_all = "lowercase")]
+pub enum IssueSeverity {
+	Critical,
+	High,
+	Medium,
+	Low,
+	Unknown,
 }
 
-pub trait ToSql: fmt::Debug {
-    fn to_sql(&self, ty: &Type, out: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
-    where
-        Self: Sized;
-
-    fn accepts(ty: &Type) -> bool
-    where
-        Self: Sized;
-
-    fn to_sql_checked(
-        &self,
-        ty: &Type,
-        out: &mut BytesMut,
-    ) -> Result<IsNull, Box<dyn Error + Sync + Send>>;
-}
-
-impl Display for IssueCategory {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            IssueCategory::Security => write!(f, "security"),
-            IssueCategory::Reliability => write!(f, "reliability"),
-            IssueCategory::Performance => write!(f, "performance"),
-            IssueCategory::Configuration => write!(f, "configuration"),
-            IssueCategory::Unknown => write!(f, "unknown"),
-        }
-    }
-}
-
-impl ToSql for IssueCategory {
-    fn to_sql(
-        &self,
-        ty: &Type,
-        out: &mut BytesMut,
-    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        format!("{}", self).to_sql(ty, out)
-    }
-
-    fn accepts(sql_type: &Type) -> bool {
-        sql_type.name() == "myenum"
-    }
-
-    to_sql_checked!();
-}
-
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Serialize, Deserialize, FromSql, ToSql, ToSchema, Clone, Debug)]
 pub struct Issue {
     pub object_id: String,
     pub category: IssueCategory,
     pub details: String,
-    pub severity: String,
+    pub severity: IssueSeverity,
     pub issue_tech_id: String,
     pub issue_message: String,
     pub reported_by: String,
@@ -108,9 +55,9 @@ pub struct PostIssue {
     object_name: String,
     #[schema(example = "Deployment")]
     object_type: String,
-    category: String,
+    category: IssueCategory,
     details: Option<String>,
-    severity: String,
+    severity: IssueSeverity,
     issue_tech_id: String,
     issue_message: String,
     reported_by: Option<String>,
@@ -133,13 +80,13 @@ pub struct IssueListWithObjects {
 
 #[derive(Deserialize, ToSchema)]
 pub struct IssuesNamespaceParams {
-    issue_type: String,
+    category: IssueCategory,
     namespace_name: String,
 }
 
 #[utoipa::path(
 	get,
-	path = "/v1/issues/{issue_type}/{namespace}",
+	path = "/v1/issues/{category}/{namespace}",
 	responses(
 		(status = 200, description = "List issues successfully", body=IssueListWithObjects),
 		(status = 500, description = "Server error")
@@ -149,11 +96,11 @@ pub struct IssuesNamespaceParams {
 		("namespace", Path, description = "Namespace name")
 	)
 )]
-pub async fn list_issues_by_type(
+pub async fn list_issues_by_category(
     Extension(db): Extension<Database>,
     Extension(kube_client): Extension<kube::Client>,
     Path(IssuesNamespaceParams {
-        issue_type,
+        category,
         namespace_name,
     }): Path<IssuesNamespaceParams>,
 ) -> Result<Json<IssueListWithObjects>, StatusCode> {
@@ -176,7 +123,7 @@ pub async fn list_issues_by_type(
     };
 
     r.objects = match db
-        .get_objects_with_issue_category_in_namespace(&issue_type, &namespace_name)
+        .get_objects_with_issue_category_in_namespace(category.clone(), &namespace_name)
         .await
     {
         Ok(objects) => objects,
@@ -190,7 +137,7 @@ pub async fn list_issues_by_type(
     };
 
     r.issues = match db
-        .get_issues_with_category_for_namespace(&issue_type, &namespace_name)
+        .get_issues_with_category_for_namespace(category, &namespace_name)
         .await
     {
         Ok(issues) => issues,

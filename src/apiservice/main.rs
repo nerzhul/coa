@@ -18,6 +18,7 @@ mod db;
         api::applications::list_gitops_applications,
         api::compute::list,
         api::billing::post_pod_invoice,
+		
         api::issues::list_issues_by_category,
         api::issues::store_issues,
     ),
@@ -26,6 +27,10 @@ mod db;
         api::billing::PodBillingEntry,
         api::billing::BillingResult,
         api::cluster::ClusterIdentity,
+
+		api::issues::ObjectWithIssues,
+		api::issues::IssueCategory,
+		api::issues::IssueSeverity,
         api::issues::IssuesNamespaceParams,
         api::issues::Issue,
         api::issues::PostIssue,

@@ -9,7 +9,7 @@ use crate::db::Database;
 use super::helpers;
 use super::objects::NamespacedObject;
 
-#[derive(Debug, FromSql, ToSql, Deserialize, Serialize, Clone)]
+#[derive(Debug, FromSql, ToSql, Deserialize, Serialize, Clone, ToSchema)]
 #[postgres(name = "issue_category", rename_all = "lowercase")]
 pub enum IssueCategory {
     Security,
@@ -19,7 +19,7 @@ pub enum IssueCategory {
     Unknown,
 }
 
-#[derive(Debug, FromSql, ToSql, Deserialize, Serialize, Clone)]
+#[derive(Debug, FromSql, ToSql, Deserialize, Serialize, Clone, ToSchema)]
 #[postgres(name = "issue_severity", rename_all = "lowercase")]
 pub enum IssueSeverity {
 	Critical,
@@ -73,9 +73,15 @@ pub struct IssueList {
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct ObjectWithIssues {
+	pub metadata: NamespacedObject,
+	pub issues: Vec<Issue>,
+}
+
+
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct IssueListWithObjects {
-    pub issues: Vec<Issue>,
-    pub objects: Vec<NamespacedObject>,
+    pub issues: Vec<ObjectWithIssues>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -119,14 +125,22 @@ pub async fn list_issues_by_category(
 
     let mut r = IssueListWithObjects {
         issues: vec![],
-        objects: vec![],
     };
 
-    r.objects = match db
+    r.issues = match db
         .get_objects_with_issue_category_in_namespace(category.clone(), &namespace_name)
         .await
     {
-        Ok(objects) => objects,
+        Ok(objects) => {
+			let issues = vec![];
+			for object in objects {
+				r.issues.push(ObjectWithIssues {
+					metadata: object.clone(),
+					issues: vec![],
+				});
+			}
+			issues
+		},
         Err(e) => {
             eprintln!(
                 "Unable to run db.get_objects_with_issue_category_in_namespace : {}",
@@ -136,11 +150,20 @@ pub async fn list_issues_by_category(
         }
     };
 
-    r.issues = match db
+    match db
         .get_issues_with_category_for_namespace(category, &namespace_name)
         .await
     {
-        Ok(issues) => issues,
+        Ok(issues) => {
+			for issue in issues {
+				for object in r.issues.iter_mut() {
+					if object.metadata.id == issue.object_id {
+						object.issues.push(issue);
+						break;
+					}
+				}
+			}
+		},
         Err(e) => {
             eprintln!(
                 "Unable to run db.get_issues_with_category_for_namespace : {}",

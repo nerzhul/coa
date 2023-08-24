@@ -9,3 +9,4 @@ pub struct NamespacedObject {
     pub namespace: String,
     pub cluster: String,
 }
+

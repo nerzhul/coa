@@ -1,6 +1,10 @@
-use crate::api::{issues::{self, IssueCategory}, objects};
+use crate::api::{
+    issues::{self, IssueCategory},
+    objects,
+};
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use log::info;
+use uuid::Uuid;
 use std::{option::Option, result::Result};
 use tokio_postgres::NoTls;
 
@@ -11,8 +15,9 @@ const STMT_GET_PRICING_ID_BY_OBJECT_TYPE: &str = "SELECT id FROM pricing WHERE o
 const STMT_ADD_INVOICE: &str = "INSERT INTO invoice(object_type, object_name, start_time, end_time, price_id VALUES ($1, $2, $3, $4, $5)";
 const STMT_GET_INVOICE_ID_BY_END_TIME: &str =
     "SELECT id FROM invoice WHERE object_type = $1 AND object_name = $2 AND end_time >= $3";
-const STMT_ADD_NAMESPACED_OBJECT: &str = "INSERT INTO namespaced_objects(object_type, object_name, namespace, cluster_name) VALUES ($1, $2, $3, $4)";
-const STMT_GET_NAMESPACED_OBJECT_ID: &str = "SELECT id FROM namespaced_objects WHERE object_type = $1 AND object_name = $2 AND namespace = $3 AND cluster_name = $4";
+//const STMT_GET_OBJECT_ID: &str = "SELECT id FROM namespaced_objects WHERE object_type = $1 AND object_name = $2 AND cluster_name = $3 AND namespace = $4";
+const STMT_CREATE_OBJECT_AND_RETURN_ID: &str = "INSERT INTO namespaced_objects (cluster_name, namespace_name, object_name, object_type) \
+	VALUES ($1,$2,$3,$4) ON CONFLICT ON CONSTRAINT pkey_issues_objects DO UPDATE set cluster_name=$1 RETURNING id";
 const STMT_ADD_OBJECT_ISSUE: &str = "INSERT INTO issues(object_id, category, details, severity, issue_tech_id, issue_message, reported_by, reported_at, last_seen_at, \
 	linked_object_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
 const STMT_GET_NAMESPACED_OBJECTS_WITH_ISSUES_WITH_CATEGORY: &str = "SELECT id, object_type, object_name, namespace_name, cluster_name FROM namespaced_objects WHERE \
@@ -21,7 +26,7 @@ const STMT_GET_NAMESPACED_OBJECTS_WITH_ISSUES_WITH_CATEGORY: &str = "SELECT id, 
 		OR \
 		id IN (SELECT linked_object_id FROM issues WHERE category = $2) \
 	) AND namespace_name = $1";
-const STMT_GET_ISSUES_WITH_CATEGORY_FOR_NAMESPACE: &str = "SELECT object_id, category::text, details, severity, issue_tech_id, issue_message, reported_by, reported_at, last_seen_at, linked_object_id \
+const STMT_GET_ISSUES_WITH_CATEGORY_FOR_NAMESPACE: &str = "SELECT object_id, category, details, severity, issue_tech_id, issue_message, reported_by, reported_at, last_seen_at, linked_object_id \
 	FROM issues WHERE object_id IN (SELECT id FROM namespaced_objects WHERE namespace_name = $2) AND category = $1";
 
 #[derive(Clone)]
@@ -121,43 +126,35 @@ impl Database {
         Ok(())
     }
 
-    pub async fn add_namespaced_object(
-        &self,
-        ns_object: objects::NamespacedObject,
-    ) -> Result<(), Error> {
-        let conn = self.pool.get().await?;
-        conn.execute(
-            STMT_ADD_NAMESPACED_OBJECT,
-            &[
-                &ns_object.object_type,
-                &ns_object.object_name,
-                &ns_object.namespace,
-                &ns_object.cluster,
-            ],
-        )
-        .await?;
-        Ok(())
-    }
+    // pub async fn get_object_id(
+    //     &self,
+    //     object_type: &str,
+    //     object_name: &str,
+    //     cluster_name: &str,
+    //     namespace: &str,
+    // ) -> Result<String, Error> {
+    //     let conn = self.pool.get().await?;
+    //     let row = conn
+    //         .query_one(
+    //             STMT_GET_OBJECT_ID,
+    //             &[&object_type, &object_name, &cluster_name, &namespace],
+    //         )
+    //         .await?;
+    //     let id: String = row.get("id");
+    //     Ok(id)
+    // }
 
-    pub async fn get_namespaced_object_id(
-        &self,
-        ns_object: objects::NamespacedObject,
-    ) -> Result<i32, Error> {
-        let conn = self.pool.get().await?;
-        let row = conn
+	pub async fn record_namespaced_object(&self, object_type: &str, object_name: &str, cluster_name: &str, namespace: &str) -> Result<Uuid, Error> {
+		let conn = self.pool.get().await?;
+		let row = conn
             .query_one(
-                STMT_GET_NAMESPACED_OBJECT_ID,
-                &[
-                    &ns_object.object_type,
-                    &ns_object.object_name,
-                    &ns_object.namespace,
-                    &ns_object.cluster,
-                ],
+                STMT_CREATE_OBJECT_AND_RETURN_ID,
+                &[&cluster_name, &namespace, &object_name, &object_type],
             )
             .await?;
-        let id: i32 = row.get(0);
+        let id: Uuid = row.get(0);
         Ok(id)
-    }
+	}
 
     pub async fn add_object_issue(&self, object_issue: issues::Issue) -> Result<(), Error> {
         let conn = self.pool.get().await?;

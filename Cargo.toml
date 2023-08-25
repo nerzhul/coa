@@ -21,6 +21,7 @@ log = "0.4.19"
 std-logger = "0.5.2"
 tower = { version = "0.4.13", features = ["timeout"] }
 postgres-types = { version = "0.2.6", features = ["derive"] }
+uuid = { version = "1.4.1", features = ["serde", "v4"] }
 
 [[bin]]
 name = "analyzer"

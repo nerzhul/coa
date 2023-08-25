@@ -25,7 +25,7 @@ pub struct BillingResult {
 	)
 )]
 pub async fn post_pod_invoice() -> (StatusCode, Json<BillingResult>) {
-    let (username, groups) = helpers::get_user_context();
+    let (_username, _groups) = helpers::get_user_context();
 
     let r = BillingResult {
         status: "OK".to_string(),

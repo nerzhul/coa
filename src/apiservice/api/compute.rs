@@ -8,7 +8,7 @@ use super::helpers;
 	)
 )]
 pub async fn list() -> &'static str {
-    let (username, groups) = helpers::get_user_context();
+    let (_username, _groups) = helpers::get_user_context();
 
     "List Compute"
 }

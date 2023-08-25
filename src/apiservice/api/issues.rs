@@ -1,8 +1,9 @@
 use axum::{extract::Path, http::StatusCode, Extension, Json};
 use log::error;
+use postgres_types::{FromSql, ToSql};
 use serde::{Deserialize, Serialize};
-use postgres_types::{ToSql, FromSql};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::db::Database;
 
@@ -22,16 +23,16 @@ pub enum IssueCategory {
 #[derive(Debug, FromSql, ToSql, Deserialize, Serialize, Clone, ToSchema)]
 #[postgres(name = "issue_severity", rename_all = "lowercase")]
 pub enum IssueSeverity {
-	Critical,
-	High,
-	Medium,
-	Low,
-	Unknown,
+    Critical,
+    High,
+    Medium,
+    Low,
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize, FromSql, ToSql, ToSchema, Clone, Debug)]
 pub struct Issue {
-    pub object_id: String,
+    pub object_id: Uuid,
     pub category: IssueCategory,
     pub details: String,
     pub severity: IssueSeverity,
@@ -45,8 +46,6 @@ pub struct Issue {
 
 #[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct PostIssue {
-    #[schema(read_only = true)]
-    id: Option<String>,
     #[schema(write_only = true)]
     cluster: String,
     #[schema(write_only = true)]
@@ -74,10 +73,9 @@ pub struct IssueList {
 
 #[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct ObjectWithIssues {
-	pub metadata: NamespacedObject,
-	pub issues: Vec<Issue>,
+    pub metadata: NamespacedObject,
+    pub issues: Vec<Issue>,
 }
-
 
 #[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct IssueListWithObjects {
@@ -123,24 +121,22 @@ pub async fn list_issues_by_category(
         }
     }
 
-    let mut r = IssueListWithObjects {
-        issues: vec![],
-    };
+    let mut r = IssueListWithObjects { issues: vec![] };
 
     r.issues = match db
         .get_objects_with_issue_category_in_namespace(category.clone(), &namespace_name)
         .await
     {
         Ok(objects) => {
-			let issues = vec![];
-			for object in objects {
-				r.issues.push(ObjectWithIssues {
-					metadata: object.clone(),
-					issues: vec![],
-				});
-			}
-			issues
-		},
+            let issues = vec![];
+            for object in objects {
+                r.issues.push(ObjectWithIssues {
+                    metadata: object.clone(),
+                    issues: vec![],
+                });
+            }
+            issues
+        }
         Err(e) => {
             eprintln!(
                 "Unable to run db.get_objects_with_issue_category_in_namespace : {}",
@@ -155,15 +151,15 @@ pub async fn list_issues_by_category(
         .await
     {
         Ok(issues) => {
-			for issue in issues {
-				for object in r.issues.iter_mut() {
-					if object.metadata.id == issue.object_id {
-						object.issues.push(issue);
-						break;
-					}
-				}
-			}
-		},
+            for issue in issues {
+                for object in r.issues.iter_mut() {
+                    if object.metadata.id == issue.object_id {
+                        object.issues.push(issue);
+                        break;
+                    }
+                }
+            }
+        }
         Err(e) => {
             eprintln!(
                 "Unable to run db.get_issues_with_category_for_namespace : {}",
@@ -185,9 +181,44 @@ pub async fn list_issues_by_category(
 		(status = 500, description = "Server error")
 	)
 )]
-pub async fn store_issues(Json(issue_list): Json<IssueList>) -> (StatusCode, &'static str) {
-    let (username, groups) = helpers::get_user_context();
+pub async fn store_issues(
+    Extension(db): Extension<Database>,
+    Json(issue_list): Json<IssueList>,
+) -> (StatusCode, &'static str) {
+    // TODO: check rights, it require another authent than the kube one
 
-    let r = "Store Issues";
-    (StatusCode::OK, r)
+	for issue in issue_list.issues {
+		let id = match db.record_namespaced_object(&issue.object_type, &issue.object_name, &issue.cluster, &issue.namespace).await {
+			Ok(id) => {
+				id
+			}
+			Err(e) => {
+				eprintln!("Unable to run db.record_namespaced_object : {}", e);
+				return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to run db.record_namespaced_object");
+			}
+		};
+
+		let issue = Issue {
+			object_id: id,
+			category: issue.category,
+			details: issue.details.unwrap_or("".to_string()),
+			severity: issue.severity,
+			issue_tech_id: issue.issue_tech_id,
+			issue_message: issue.issue_message,
+			reported_by: issue.reported_by.unwrap_or("".to_string()),
+			reported_at: issue.reported_at.unwrap_or("".to_string()),
+			last_seen_at: issue.last_seen_at.unwrap_or("".to_string()),
+			linked_object_id: issue.linked_object_id.unwrap_or("".to_string()),
+		};
+
+		match db.add_object_issue(issue).await {
+			Ok(_) => {}
+			Err(e) => {
+				eprintln!("Unable to run add_object_issue.add_issue : {}", e);
+				return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to run db.add_issue");
+			}
+		}
+	}
+
+    (StatusCode::OK, "{}")
 }
